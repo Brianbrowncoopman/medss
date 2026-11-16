@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import Footer from "@/components/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MediSS - Control de Esclerosis Múltiple",
+  title: "MedS - Control de Esclerosis Múltiple",
   description: "Aplicación de seguimiento clínico y recordatorios",
 };
 
@@ -29,6 +30,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
         </AuthProvider>
+        <Footer />
       </body>
     </html>
   );
