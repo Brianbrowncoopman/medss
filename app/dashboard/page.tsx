@@ -79,8 +79,9 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Tarjetas de acceso rápido (Las 3 tarjetas) */}
+        {/* Tarjetas de acceso rápido (Las 5 tarjetas) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/*ficha*/}
           <div 
             onClick={() => router.push("/dashboard/ficha")}
             className="bg-gradient-to-br from-white/90 to-orange-50/90 backdrop-blur-md p-6 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer border border-orange-200 border-l-4 border-l-orange-500"
@@ -93,7 +94,7 @@ export default function DashboardPage() {
               Actualiza tus datos clínicos, tipo de EM y neurólogo tratante.
             </p>
           </div>
-
+          {/*historial*/}
           <div 
             onClick={() => router.push("/dashboard/historial")}
             className="bg-gradient-to-br from-white/90 to-orange-50/90 backdrop-blur-md p-6 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer border border-orange-200 border-l-4 border-l-orange-600"
@@ -106,7 +107,7 @@ export default function DashboardPage() {
               Registra tus medicamentos actuales, pasados y exámenes con documentos adjuntos.
             </p>
           </div>
-
+          {/*como estoy*/}
           <div 
             onClick={() => router.push("/dashboard/comoestoy")}
             className="bg-gradient-to-br from-white/90 to-orange-50/90 backdrop-blur-md p-6 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer border border-orange-200 border-l-4 border-l-orange-500"
@@ -119,10 +120,7 @@ export default function DashboardPage() {
               Registra tu estado diario por zonas corporales y síntomas de la EM.
             </p>
           </div>
-
-          
-
-          {/* Tarjeta Alertas y Calendario que lleva a su propia página */}
+          {/* calendario */}
           <div 
             onClick={() => router.push("/dashboard/alertas")}
             className="bg-gradient-to-br from-white/90 to-amber-50/90 backdrop-blur-md p-6 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer border border-orange-200 border-l-4 border-l-amber-500"
@@ -135,10 +133,8 @@ export default function DashboardPage() {
               Programa recordatorios de toma de medicamentos y horas médicas.
             </p>
           </div>
-        </div>
-
-
-        <div 
+           {/*brotes*/}
+          <div 
             onClick={() => router.push("/dashboard/brotes")}
             className="bg-gradient-to-br from-white/90 to-orange-50/90 backdrop-blur-md p-6 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer border border-orange-200 border-l-4 border-l-orange-600"
           >
@@ -150,6 +146,16 @@ export default function DashboardPage() {
               Registro y seguimiento de  tus Brotes.
             </p>
           </div>
+
+
+
+
+
+
+        </div>
+
+
+        
 
         {/* Sección exclusiva de Próximas Citas Médicas abajo de las tarjetas */}
         <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-6 sm:p-8 border border-orange-200/80">
