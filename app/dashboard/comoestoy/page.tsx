@@ -40,6 +40,20 @@ interface RegistroDetalladoEM {
   fatigaCronica: number;
   controlEsfinteres: number;
   cognicionNieblaMental: number;
+
+  // NUEVO 6. Sentir General, Sueño, Fatiga, Cognición y Dolor Global
+  sentirGeneralEstado: number; // 0-10
+  suenoCalidad: number; // 0-10 (0 muy malo, 10 excelente)
+  suenoTipoProblema: string; // Insomnio, sueño no reparador, etc.
+  fatigaIntensidad: number; // 0-10
+  cognicionLagunas: number; // 0-10
+  dolorGlobalTipo: string; // Neuropático, muscular, cefalea
+  dolorGlobalIntensidad: number; // 0-10
+
+  // NUEVO 7. Variables Psicológicas y Sociales
+  psicologicoAnimo: number; // 0-10 (0 muy bajo, 10 excelente)
+  psicologicoHumorMalGenio: number; // 0-10 (irritabilidad)
+  participacionSocial: number; // 0-10 (0 aislado, 10 alta participación)
   
   notasGenerales: string;
 }
@@ -53,8 +67,26 @@ export default function ComoEstoyPage() {
   const [historialRegistros, setHistorialRegistros] = useState<RegistroDetalladoEM[]>([]);
   const [modoHistorial, setModoHistorial] = useState(false);
 
+  const getChileanDateTime = () => {
+    const ahora = new Date();
+    const opciones: Intl.DateTimeFormatOptions = {
+      timeZone: "America/Santiago",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    };
+    
+    const partes = new Intl.DateTimeFormat("es-CL", opciones).formatToParts(ahora);
+    const getPart = (type: string) => partes.find(p => p.type === type)?.value || "";
+
+    return `${getPart("year")}-${getPart("month")}-${getPart("day")}T${getPart("hour")}:${getPart("minute")}`;
+  };
+
   const [formData, setFormData] = useState<RegistroDetalladoEM>({
-    fechaHora: new Date().toISOString().slice(0, 16),
+    fechaHora: getChileanDateTime(),
     cabezaDolorIntensidad: 0,
     cabezaDolorTipo: "Ninguno",
     visionDoble: false,
@@ -75,6 +107,19 @@ export default function ComoEstoyPage() {
     fatigaCronica: 0,
     controlEsfinteres: 0,
     cognicionNieblaMental: 0,
+    
+    // Valores por defecto campos 6 y 7
+    sentirGeneralEstado: 5,
+    suenoCalidad: 5,
+    suenoTipoProblema: "Normal",
+    fatigaIntensidad: 0,
+    cognicionLagunas: 0,
+    dolorGlobalTipo: "Ninguno",
+    dolorGlobalIntensidad: 0,
+    psicologicoAnimo: 5,
+    psicologicoHumorMalGenio: 0,
+    participacionSocial: 5,
+
     notasGenerales: "",
   });
 
@@ -88,7 +133,6 @@ export default function ComoEstoyPage() {
 
   const fetchUserDataAndHistory = async () => {
     try {
-      // Cargar datos del usuario para el Navbar de forma independiente
       const userSnap = await getDoc(doc(db, "users", user!.uid));
       if (userSnap.exists()) {
         setNombrePaciente(userSnap.data().nombre || user!.email || "Paciente");
@@ -96,7 +140,6 @@ export default function ComoEstoyPage() {
         setNombrePaciente(user!.email || "Paciente");
       }
 
-      // Cargar historial de síntomas detallados
       const q = query(collection(db, "users", user!.uid, "sintomasDetallados"), orderBy("fechaHora", "desc"));
       const snap = await getDocs(q);
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroDetalladoEM));
@@ -136,7 +179,6 @@ export default function ComoEstoyPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-100 via-amber-50/70 to-orange-200/80 pb-12">
-      {/* Navbar con el nombre del paciente sincronizado */}
       <Navbar nombrePaciente={nombrePaciente} />
 
       <main className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -438,9 +480,131 @@ export default function ComoEstoyPage() {
                     />
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Observaciones / Factores desencadenantes (Ej. Calor, estrés, post-ejercicio)</label>
+              {/* NUEVA SECCIÓN 6: Sentir General, Sueño, Fatiga, Cognición y Dolor */}
+              <div className="space-y-4 p-5 bg-white/80 rounded-2xl border border-orange-200 shadow-2xs">
+                <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                  6. Sentir General, Sueño, Fatiga, Cognición y Dolor Global
+                </h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">🌟 Estado de Sentir General (0 = Muy Malo, 10 = Excelente): <b>{formData.sentirGeneralEstado}</b></label>
+                    <input
+                      type="range" min="0" max="10" value={formData.sentirGeneralEstado}
+                      onChange={(e) => setFormData({ ...formData, sentirGeneralEstado: Number(e.target.value) })}
+                      className="w-full accent-orange-600 cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">🌙 Calidad del Sueño (0 = Insomnio total, 10 = Sueño reparador): <b>{formData.suenoCalidad}</b></label>
+                      <input
+                        type="range" min="0" max="10" value={formData.suenoCalidad}
+                        onChange={(e) => setFormData({ ...formData, suenoCalidad: Number(e.target.value) })}
+                        className="w-full accent-orange-600 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Problema de Sueño</label>
+                      <select
+                        value={formData.suenoTipoProblema}
+                        onChange={(e) => setFormData({ ...formData, suenoTipoProblema: e.target.value })}
+                        className="w-full px-3 py-2 border border-orange-200 rounded-xl text-sm bg-white"
+                      >
+                        <option value="Normal">Normal / Sin problemas</option>
+                        <option value="Insomnio de conciliación">Insomnio (Costo para dormir)</option>
+                        <option value="Despertares nocturnos">Despertares nocturnos frecuentes</option>
+                        <option value="Sueño no reparador">Sueño no reparador (fatiga al despertar)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">⚡ Intensidad de Fatiga General (0-10): <b>{formData.fatigaIntensidad}</b></label>
+                      <input
+                        type="range" min="0" max="10" value={formData.fatigaIntensidad}
+                        onChange={(e) => setFormData({ ...formData, fatigaIntensidad: Number(e.target.value) })}
+                        className="w-full accent-orange-600 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">🧠 Nivel de Lagunas / Nubes Mentales (0-10): <b>{formData.cognicionLagunas}</b></label>
+                      <input
+                        type="range" min="0" max="10" value={formData.cognicionLagunas}
+                        onChange={(e) => setFormData({ ...formData, cognicionLagunas: Number(e.target.value) })}
+                        className="w-full accent-orange-600 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Dolor Global</label>
+                      <select
+                        value={formData.dolorGlobalTipo}
+                        onChange={(e) => setFormData({ ...formData, dolorGlobalTipo: e.target.value })}
+                        className="w-full px-3 py-2 border border-orange-200 rounded-xl text-sm bg-white"
+                      >
+                        <option value="Ninguno">Ninguno</option>
+                        <option value="Neuropático">Neuropático (ardor, corrientazos)</option>
+                        <option value="Muscular">Muscular</option>
+                        <option value="Cefalea">Cefalea / Migraña</option>
+                        <option value="Mixto">Mixto</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Intensidad de este Dolor (0-10): <b>{formData.dolorGlobalIntensidad}</b></label>
+                      <input
+                        type="range" min="0" max="10" value={formData.dolorGlobalIntensidad}
+                        onChange={(e) => setFormData({ ...formData, dolorGlobalIntensidad: Number(e.target.value) })}
+                        className="w-full accent-orange-600 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* NUEVA SECCIÓN 7: Variables Psicológicas y Sociales */}
+              <div className="space-y-4 p-5 bg-white/80 rounded-2xl border border-orange-200 shadow-2xs">
+                <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                  7. Variables Psicológicas y Participación Social
+                </h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">😊 Estado de Ánimó General (0 = Muy bajo/deprimido, 10 = Excelente): <b>{formData.psicologicoAnimo}</b></label>
+                    <input
+                      type="range" min="0" max="10" value={formData.psicologicoAnimo}
+                      onChange={(e) => setFormData({ ...formData, psicologicoAnimo: Number(e.target.value) })}
+                      className="w-full accent-orange-600 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">😡 Cambios de Humor / Mal Genio / Irritabilidad (0 = Tranquilo, 10 = Muy irritable): <b>{formData.psicologicoHumorMalGenio}</b></label>
+                    <input
+                      type="range" min="0" max="10" value={formData.psicologicoHumorMalGenio}
+                      onChange={(e) => setFormData({ ...formData, psicologicoHumorMalGenio: Number(e.target.value) })}
+                      className="w-full accent-orange-600 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">👥 Participación Social y Conexión con Entorno (0 = Aislado, 10 = Muy participativo): <b>{formData.participacionSocial}</b></label>
+                    <input
+                      type="range" min="0" max="10" value={formData.participacionSocial}
+                      onChange={(e) => setFormData({ ...formData, participacionSocial: Number(e.target.value) })}
+                      className="w-full accent-orange-600 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Observaciones / Factores desencadenantes (Calor, estrés, etc.)</label>
                   <textarea
                     rows={3}
                     value={formData.notasGenerales}
@@ -463,7 +627,7 @@ export default function ComoEstoyPage() {
         ) : (
           /* Historial Detallado */
           <div className="bg-gradient-to-br from-white/95 via-orange-50/90 to-amber-50/90 backdrop-blur-md p-6 sm:p-8 rounded-2xl shadow-xl border border-orange-200 space-y-4">
-            <h2 className="text-lg font-bold text-gray-900 pb-2 border-b border-orange-200">Historial de Registros Anatómicos</h2>
+            <h2 className="text-lg font-bold text-gray-900 pb-2 border-b border-orange-200">Historial de Registros Anatómicos y Psicológicos</h2>
             
             <div className="space-y-4 max-h-[550px] overflow-y-auto pr-1">
               {historialRegistros.length === 0 ? (
@@ -484,24 +648,19 @@ export default function ComoEstoyPage() {
                       </div>
 
                       <div className="bg-orange-50/80 p-3 rounded-xl border border-orange-100 space-y-1">
-                        <p className="font-bold text-orange-900">Extremidades Superiores:</p>
-                        <p>🦾 Der: Debilidad <b>{r.brazoDerechoDebilidad}/10</b> ({r.brazoDerechoSensacion})</p>
-                        <p>🦾 Izq: Debilidad <b>{r.brazoIzquierdoDebilidad}/10</b> ({r.brazoIzquierdoSensacion})</p>
+                        <p className="font-bold text-orange-900">Sentir, Sueño y Cognición Global:</p>
+                        <p>🌟 Estado General: <b>{r.sentirGeneralEstado ?? "-"}/10</b></p>
+                        <p>🌙 Sueño: <b>{r.suenoCalidad ?? "-"}/10</b> ({r.suenoTipoProblema || "Normal"})</p>
+                        <p>⚡ Fatiga Global: <b>{r.fatigaIntensidad ?? "-"}/10</b></p>
+                        <p>🧠 Lagunas Mentales: <b>{r.cognicionLagunas ?? "-"}/10</b></p>
+                        <p>🩹 Dolor Global: <b>{r.dolorGlobalIntensidad ?? "-"}/10</b> ({r.dolorGlobalTipo || "Ninguno"})</p>
                       </div>
 
                       <div className="bg-orange-50/80 p-3 rounded-xl border border-orange-100 space-y-1">
-                        <p className="font-bold text-orange-900">Tronco y Extremidades Inferiores:</p>
-                        <p>⚡ Signo Lhermitte: <b>{r.signoLhermitte ? "Sí" : "No"}</b></p>
-                        <p>🦵 Pierna Der: Debilidad <b>{r.piernaDerechaDebilidad}/10</b> | Rigidez <b>{r.piernaDerechaEspasticidad}/10</b></p>
-                        <p>🦵 Pierna Izq: Debilidad <b>{r.piernaIzquierdaDebilidad}/10</b> | Rigidez <b>{r.piernaIzquierdaEspasticidad}/10</b></p>
-                        <p>⚖️ Equilibrio/Ataxia: <b>{r.problemasEquilibrioAtaxia}/10</b></p>
-                      </div>
-
-                      <div className="bg-orange-50/80 p-3 rounded-xl border border-orange-100 space-y-1">
-                        <p className="font-bold text-orange-900">Sistémicos y Cognitivos:</p>
-                        <p>⚡ Fatiga: <b>{r.fatigaCronica}/10</b></p>
-                        <p>🚻 Esfínteres: <b>{r.controlEsfinteres}/10</b></p>
-                        <p>🧠 Cognición: <b>{r.cognicionNieblaMental}/10</b></p>
+                        <p className="font-bold text-orange-900">Variables Psicológicas y Sociales:</p>
+                        <p>😊 Ánimo: <b>{r.psicologicoAnimo ?? "-"}/10</b></p>
+                        <p>😡 Irritabilidad/Mal Genio: <b>{r.psicologicoHumorMalGenio ?? "-"}/10</b></p>
+                        <p>👥 Participación Social: <b>{r.participacionSocial ?? "-"}/10</b></p>
                       </div>
                     </div>
 

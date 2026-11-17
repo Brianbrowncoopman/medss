@@ -10,13 +10,15 @@ import Navbar from "@/components/Navbar";
 interface RegistroBrote {
   id?: string;
   fechaInicio: string;
-  fechaResolucion?: string;
+  duracionDias: number; // NUEVO: Cuántos días persistieron
   severidad: number; // 1-10
-  sintomasPrincipales: string;
-  factorDesencadenante: string;
-  tratamientoRecibido: string; // Ej. Pulsos de Metilprednisolona
+  sintomasPrincipales: string; // Manifestaciones nuevas o agravadas
+  consultoProfesional: boolean; // NUEVO: Si consultó a un profesional
   lugarAtencion: string;
-  gradoRecuperacion: string; // Total, Parcial, Sin cambios
+  tratamientoRecibido: string; // NUEVO: Corticoides u otra intervención
+  factorDesencadenante: string;
+  gradoRecuperacion: string; // Completa, parcial o pendiente
+  fechaRecuperacion?: string; // NUEVO: Cuando corresponda
   notasMedicas: string;
 }
 
@@ -31,13 +33,15 @@ export default function BrotesPage() {
 
   const [formData, setFormData] = useState<RegistroBrote>({
     fechaInicio: new Date().toISOString().split("T")[0],
-    fechaResolucion: "",
+    duracionDias: 1,
     severidad: 5,
     sintomasPrincipales: "",
-    factorDesencadenante: "Desconocido / Espontáneo",
-    tratamientoRecibido: "Ninguno",
+    consultoProfesional: true,
     lugarAtencion: "",
-    gradoRecuperacion: "En evaluación",
+    tratamientoRecibido: "Pulsos de Corticoides IV",
+    factorDesencadenante: "Desconocido / Espontáneo",
+    gradoRecuperacion: "Pendiente",
+    fechaRecuperacion: "",
     notasMedicas: "",
   });
 
@@ -76,13 +80,15 @@ export default function BrotesPage() {
       alert("¡Registro de brote guardado con éxito!");
       setFormData({
         fechaInicio: new Date().toISOString().split("T")[0],
-        fechaResolucion: "",
+        duracionDias: 1,
         severidad: 5,
         sintomasPrincipales: "",
-        factorDesencadenante: "Desconocido / Espontáneo",
-        tratamientoRecibido: "Ninguno",
+        consultoProfesional: true,
         lugarAtencion: "",
-        gradoRecuperacion: "En evaluación",
+        tratamientoRecibido: "Pulsos de Corticoides IV",
+        factorDesencadenante: "Desconocido / Espontáneo",
+        gradoRecuperacion: "Pendiente",
+        fechaRecuperacion: "",
         notasMedicas: "",
       });
       setModoHistorial(true);
@@ -139,9 +145,10 @@ export default function BrotesPage() {
           <div className="bg-gradient-to-br from-white/95 via-orange-50/90 to-amber-50/90 backdrop-blur-md p-6 sm:p-8 rounded-2xl shadow-xl border border-orange-200">
             <form onSubmit={handleSubmit} className="space-y-6">
               
+              {/* Fechas y Duración */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Inicio del Brote</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Inicio del Brote *</label>
                   <input
                     type="date"
                     required
@@ -151,43 +158,90 @@ export default function BrotesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Resolución (Opcional)</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Duración (Días que persistieron)</label>
                   <input
-                    type="date"
-                    value={formData.fechaResolucion}
-                    onChange={(e) => setFormData({ ...formData, fechaResolucion: e.target.value })}
+                    type="number"
+                    min="1"
+                    required
+                    value={formData.duracionDias}
+                    onChange={(e) => setFormData({ ...formData, duracionDias: Number(e.target.value) })}
                     className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
+                    placeholder="Ej. 7 días"
                   />
                 </div>
               </div>
 
+              {/* Intensidad / Severidad */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Severidad del Brote (1 al 10): <span className="text-orange-600 font-bold">{formData.severidad}</span>
+                  Intensidad / Severidad (Escala de 0 a 10): <span className="text-orange-600 font-bold">{formData.severidad}</span>
                 </label>
                 <input
-                  type="range" min="1" max="10"
+                  type="range" min="0" max="10"
                   value={formData.severidad}
                   onChange={(e) => setFormData({ ...formData, severidad: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
 
+              {/* Síntomas (Manifestaciones nuevas o agravadas) */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Síntomas Principales / Neurológicos</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Síntomas (Manifestaciones nuevas o agravadas) *</label>
                 <textarea
                   rows={2}
                   required
                   value={formData.sintomasPrincipales}
                   onChange={(e) => setFormData({ ...formData, sintomasPrincipales: e.target.value })}
                   className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
-                  placeholder="Ej. Neuritis óptica en ojo izquierdo, pérdida de fuerza en pierna derecha..."
+                  placeholder="Ej. Neuritis óptica en ojo izquierdo, pérdida de fuerza aguda..."
                 />
               </div>
 
+              {/* Atención Médica y Lugar */}
+              <div className="p-4 bg-white/70 rounded-xl border border-orange-200 space-y-4">
+                <h3 className="text-xs font-bold text-orange-900 uppercase tracking-wider">Atención Médica Profesional</h3>
+                
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="consulto"
+                    checked={formData.consultoProfesional}
+                    onChange={(e) => setFormData({ ...formData, consultoProfesional: e.target.checked })}
+                    className="w-4 h-4 text-orange-600 rounded"
+                  />
+                  <label htmlFor="consulto" className="text-sm font-medium text-gray-800 cursor-pointer">
+                    ¿Consultó a un profesional / centro médico por este brote?
+                  </label>
+                </div>
+
+                {formData.consultoProfesional && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Lugar de Atención / Hospital</label>
+                    <input
+                      type="text"
+                      value={formData.lugarAtencion}
+                      onChange={(e) => setFormData({ ...formData, lugarAtencion: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
+                      placeholder="Ej. Urgencias / Hospital Clínico / Neurólogo"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Tratamiento de Rescate y Desencadenante */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Factor Desencadenante Sospechoso</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Tratamiento (Corticoides u otra intervención)</label>
+                  <input
+                    type="text"
+                    value={formData.tratamientoRecibido}
+                    onChange={(e) => setFormData({ ...formData, tratamientoRecibido: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
+                    placeholder="Ej. Pulsos de Metilprednisolona IV 1g por 5 días"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Factor Desencadenante</label>
                   <select
                     value={formData.factorDesencadenante}
                     onChange={(e) => setFormData({ ...formData, factorDesencadenante: e.target.value })}
@@ -200,52 +254,43 @@ export default function BrotesPage() {
                     <option value="Fatiga extrema">Fatiga extrema</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Tratamiento de Rescate Recibido</label>
-                  <input
-                    type="text"
-                    value={formData.tratamientoRecibido}
-                    onChange={(e) => setFormData({ ...formData, tratamientoRecibido: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
-                    placeholder="Ej. Pulsos de Corticoides IV (Metilprednisolona)"
-                  />
-                </div>
               </div>
 
+              {/* Recuperación y Fecha de Recuperación */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Lugar de Atención / Hospital</label>
-                  <input
-                    type="text"
-                    value={formData.lugarAtencion}
-                    onChange={(e) => setFormData({ ...formData, lugarAtencion: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
-                    placeholder="Ej. Urgencias / Hospital Clínico"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Grado de Recuperación</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Recuperación</label>
                   <select
                     value={formData.gradoRecuperacion}
                     onChange={(e) => setFormData({ ...formData, gradoRecuperacion: e.target.value })}
                     className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
                   >
-                    <option value="En evaluación">En evaluación / Curso actual</option>
-                    <option value="Recuperación total">Recuperación total</option>
-                    <option value="Recuperación parcial (con secuelas)">Recuperación parcial (con secuelas)</option>
+                    <option value="Pendiente">Pendiente / En curso</option>
+                    <option value="Completa">Completa</option>
+                    <option value="Parcial">Parcial (con secuelas)</option>
                     <option value="Sin recuperación">Sin recuperación</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Recuperación (Cuando corresponda)</label>
+                  <input
+                    type="date"
+                    value={formData.fechaRecuperacion}
+                    onChange={(e) => setFormData({ ...formData, fechaRecuperacion: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
+                  />
+                </div>
               </div>
 
+              {/* Observaciones */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Observaciones Médicas / Notas</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Observaciones / Notas Médicas</label>
                 <textarea
                   rows={2}
-                  value={formData.notasMedicas || formData.notasMedicas}
+                  value={formData.notasMedicas}
                   onChange={(e) => setFormData({ ...formData, notasMedicas: e.target.value })}
                   className="w-full px-4 py-2.5 border border-orange-200 rounded-xl text-sm bg-white"
-                  placeholder="Instrucciones del neurólogo, exámenes asociados..."
+                  placeholder="Indicaciones del neurólogo, exámenes asociados..."
                 />
               </div>
 
@@ -259,7 +304,7 @@ export default function BrotesPage() {
             </form>
           </div>
         ) : (
-          /* Historial de Brotes */
+          /* Historial de Brotes con todos los detalles visuales */
           <div className="bg-gradient-to-br from-white/95 via-orange-50/90 to-amber-50/90 backdrop-blur-md p-6 sm:p-8 rounded-2xl shadow-xl border border-orange-200 space-y-4">
             <h2 className="text-lg font-bold text-gray-900 pb-2 border-b border-orange-200">Historial de Brotes Registrados</h2>
             
@@ -271,20 +316,20 @@ export default function BrotesPage() {
                   <div key={b.id} className="p-4 border border-orange-200 rounded-xl bg-white shadow-2xs space-y-2 relative">
                     <div className="flex justify-between items-start">
                       <span className="text-xs font-extrabold text-red-700 bg-red-100 px-3 py-1 rounded-full">
-                        🚨 Inicio: {b.fechaInicio} {b.fechaResolucion && `➔ Resolución: ${b.fechaResolucion}`}
+                        🚨 Inicio: {b.fechaInicio} ({b.duracionDias || 1} días de duración)
                       </span>
                       <span className="text-xs font-bold text-orange-900 bg-orange-100 px-2.5 py-1 rounded-lg">
-                        Severidad: {b.severidad}/10
+                        Intensidad: {b.severidad}/10
                       </span>
                     </div>
 
                     <div className="pt-1">
                       <h4 className="text-sm font-bold text-gray-900">Síntomas: {b.sintomasPrincipales}</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-700 mt-2 bg-orange-50/60 p-3 rounded-lg border border-orange-100">
-                        <p>⚡ <b>Desencadenante:</b> {b.factorDesencadenante}</p>
+                        <p>🏥 <b>Atención Médica:</b> {b.consultoProfesional ? `Sí (${b.lugarAtencion || "Centro médico"})` : "No consultó"}</p>
                         <p>💊 <b>Tratamiento:</b> {b.tratamientoRecibido}</p>
-                        <p>🏥 <b>Lugar:</b> {b.lugarAtencion || "No especificado"}</p>
-                        <p>📈 <b>Recuperación:</b> {b.gradoRecuperacion}</p>
+                        <p>⚡ <b>Desencadenante:</b> {b.factorDesencadenante}</p>
+                        <p>📈 <b>Recuperación:</b> {b.gradoRecuperacion} {b.fechaRecuperacion ? `(El ${b.fechaRecuperacion})` : ""}</p>
                       </div>
                     </div>
 

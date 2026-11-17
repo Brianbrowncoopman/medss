@@ -10,14 +10,40 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-// 1. Esquema de validación con Zod para la Ficha Clínica
+// 1. Esquema de validación completo con Zod
 const fichaSchema = z.object({
-   email: z.string().email("Por favor ingresa un correo electrónico válido"),
+  // Identificación
+  identificadorInterno: z.string().optional(),
   nombre: z.string().min(3, "El nombre completo es obligatorio (mínimo 3 caracteres)"),
   fechaNacimiento: z.string().min(1, "La fecha de nacimiento es obligatoria"),
+
+  // Diagnóstico e Historia Clínica
+  fechaDiagnostico: z.string().optional(),
   tipoEM: z.string().min(1, "Selecciona el tipo de Esclerosis Múltiple"),
+  edadInicio: z.string().optional(),
+  fechaPrimerosSintomas: z.string().optional(),
+  descripcionPrimerosSintomas: z.string().optional(),
+  movilidad: z.string().min(1, "Selecciona el estado de movilidad"),
+  otraMovilidad: z.string().optional(),
+
+  // Equipo Médico
   neurologoTratante: z.string().min(2, "Indica el nombre del neurólogo tratante"),
   centroMedico: z.string().min(2, "Indica el centro médico u hospital"),
+
+  // Antecedentes y Alergias
+  antecedentesRelevantes: z.string().optional(),
+  alergias: z.string().optional(),
+
+  // Tratamiento Actual (Lista dinámica)
+  tratamientosActuales: z.array(
+    z.object({
+      medicamento: z.string().min(2, "El nombre del medicamento es requerido"),
+      dosis: z.string().min(1, "La dosis es requerida"),
+      frecuencia: z.string().min(2, "La frecuencia es requerida"),
+    })
+  ),
+
+  // Cobertura Médica y Beneficios
   coberturaMedica: z.string().min(1, "Selecciona una cobertura médica"),
   otraIsapre: z.string().optional(),
   ges: z.boolean(),
@@ -29,6 +55,8 @@ const fichaSchema = z.object({
       fechaInicio: z.string().min(1, "La fecha de inicio es requerida"),
     })
   ),
+
+  // Contacto de Emergencia
   contactoEmergenciaNombre: z.string().min(2, "El nombre del contacto de emergencia es obligatorio"),
   contactoEmergenciaTelefono: z.string().min(6, "Ingresa un teléfono válido de emergencia"),
 });
@@ -54,11 +82,21 @@ export default function FichaClinicaPage() {
   } = useForm<FichaFormValues>({
     resolver: zodResolver(fichaSchema),
     defaultValues: {
+      identificadorInterno: "",
       nombre: "",
       fechaNacimiento: "",
+      fechaDiagnostico: "",
       tipoEM: "Remitente-Recurrente (EMRR)",
+      edadInicio: "",
+      fechaPrimerosSintomas: "",
+      descripcionPrimerosSintomas: "",
+      movilidad: "Independiente",
+      otraMovilidad: "",
       neurologoTratante: "",
       centroMedico: "",
+      antecedentesRelevantes: "",
+      alergias: "",
+      tratamientosActuales: [],
       coberturaMedica: "Fonasa",
       otraIsapre: "",
       ges: false,
@@ -70,13 +108,29 @@ export default function FichaClinicaPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  // Array dinámico para Estudios Clínicos
+  const {
+    fields: estudiosFields,
+    append: appendEstudio,
+    remove: removeEstudio,
+  } = useFieldArray({
     control,
     name: "estudiosLista",
   });
 
+  // Array dinámico para Tratamientos Actuales
+  const {
+    fields: tratamientosFields,
+    append: appendTratamiento,
+    remove: removeTratamiento,
+  } = useFieldArray({
+    control,
+    name: "tratamientosActuales",
+  });
+
   const watchEstudioClinico = watch("estudioClinico");
   const watchCobertura = watch("coberturaMedica");
+  const watchMovilidad = watch("movilidad");
 
   useEffect(() => {
     if (!user) {
@@ -88,14 +142,26 @@ export default function FichaClinicaPage() {
       try {
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
+        const defaultId = `MED-${user.uid.slice(0, 6).toUpperCase()}`;
+
         if (docSnap.exists()) {
           const data = docSnap.data();
           reset({
+            identificadorInterno: data.identificadorInterno || defaultId,
             nombre: data.nombre || user.displayName || "",
             fechaNacimiento: data.fechaNacimiento || "",
+            fechaDiagnostico: data.fechaDiagnostico || "",
             tipoEM: data.tipoEM || "Remitente-Recurrente (EMRR)",
+            edadInicio: data.edadInicio || "",
+            fechaPrimerosSintomas: data.fechaPrimerosSintomas || "",
+            descripcionPrimerosSintomas: data.descripcionPrimerosSintomas || "",
+            movilidad: data.movilidad || "Independiente",
+            otraMovilidad: data.otraMovilidad || "",
             neurologoTratante: data.neurologoTratante || "",
             centroMedico: data.centroMedico || "",
+            antecedentesRelevantes: data.antecedentesRelevantes || "",
+            alergias: data.alergias || "",
+            tratamientosActuales: data.tratamientosActuales || [],
             coberturaMedica: data.coberturaMedica || "Fonasa",
             otraIsapre: data.otraIsapre || "",
             ges: data.ges || false,
@@ -108,8 +174,16 @@ export default function FichaClinicaPage() {
           setNombrePaciente(data.nombre || user.email || "Paciente");
         } else {
           reset({
+            identificadorInterno: defaultId,
             nombre: user.displayName || "",
-            email: user.email || "",
+            tipoEM: "Remitente-Recurrente (EMRR)",
+            movilidad: "Independiente",
+            coberturaMedica: "Fonasa",
+            ges: false,
+            ricarteSoto: false,
+            estudioClinico: false,
+            tratamientosActuales: [],
+            estudiosLista: [],
           });
           setNombrePaciente(user.email || "Paciente");
         }
@@ -131,12 +205,16 @@ export default function FichaClinicaPage() {
 
     try {
       const docRef = doc(db, "users", user.uid);
-      await setDoc(docRef, {
-        ...data,
-        uid: user.uid,
-        email: user.email,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      await setDoc(
+        docRef,
+        {
+          ...data,
+          uid: user.uid,
+          email: user.email,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
 
       setMensaje("¡Ficha médica actualizada con éxito!");
       setTimeout(() => router.push("/dashboard"), 1500);
@@ -166,85 +244,289 @@ export default function FichaClinicaPage() {
           <div className="mb-6 border-b border-orange-200 pb-4">
             <h1 className="text-2xl font-extrabold text-gray-900">Ficha Médica de Control - EM</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Actualiza tu información clínica, red de apoyo y coberturas de salud.
+              Actualiza tu identificación clínica, historial de diagnóstico, tratamientos y coberturas de salud.
             </p>
           </div>
 
           {mensaje && (
-            <div className={`mb-6 p-4 rounded-xl text-sm font-medium ${
-              mensaje.includes("éxito") 
-                ? "bg-green-50 text-green-700 border border-green-200" 
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}>
+            <div
+              className={`mb-6 p-4 rounded-xl text-sm font-medium ${
+                mensaje.includes("éxito")
+                  ? "bg-green-50 text-green-700 border border-green-200"
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}
+            >
               {mensaje}
             </div>
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             
-            {/* Datos Personales */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre Completo</label>
-                <input
-                  type="text"
-                  {...register("nombre")}
-                  className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
-                />
-                {errors.nombre && <p className="text-xs text-red-600 mt-1">{errors.nombre.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Nacimiento</label>
-                <input
-                  type="date"
-                  {...register("fechaNacimiento")}
-                  className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
-                />
-                {errors.fechaNacimiento && <p className="text-xs text-red-600 mt-1">{errors.fechaNacimiento.message}</p>}
-              </div>
-            </div>
-
-            {/* Tipo de EM */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Esclerosis Múltiple (EM)</label>
-              <select
-                {...register("tipoEM")}
-                className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
-              >
-                <option value="Remitente-Recurrente (EMRR)">Remitente-Recurrente (EMRR)</option>
-                <option value="Secundaria Progresiva (EMSP)">Secundaria Progresiva (EMSP)</option>
-                <option value="Primaria Progresiva (EMPP)">Primaria Progresiva (EMPP)</option>
-                <option value="En estudio">En estudio</option>
-              </select>
-            </div>
-
-            {/* Equipo Médico */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Neurólogo Tratante</label>
-                <input
-                  type="text"
-                  {...register("neurologoTratante")}
-                  className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
-                  placeholder="Dr(a)..."
-                />
-                {errors.neurologoTratante && <p className="text-xs text-red-600 mt-1">{errors.neurologoTratante.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Centro Médico / Hospital</label>
-                <input
-                  type="text"
-                  {...register("centroMedico")}
-                  className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
-                  placeholder="Ej: Hospital Clínico..."
-                />
-                {errors.centroMedico && <p className="text-xs text-red-600 mt-1">{errors.centroMedico.message}</p>}
-              </div>
-            </div>
-
-            {/* Cobertura Médica */}
+            {/* 1. IDENTIFICACIÓN */}
             <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Cobertura Médica</h3>
+              <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                1. Identificación del Paciente
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">ID Interno / Ficha</label>
+                  <input
+                    type="text"
+                    {...register("identificadorInterno")}
+                    className="w-full px-3.5 py-2.5 border border-orange-200 rounded-xl bg-orange-50/50 text-gray-800 font-mono text-sm focus:ring-2 focus:ring-orange-500"
+                    placeholder="Ej: MED-001"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre Completo *</label>
+                  <input
+                    type="text"
+                    {...register("nombre")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
+                  />
+                  {errors.nombre && <p className="text-xs text-red-600 mt-1">{errors.nombre.message}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Nacimiento *</label>
+                  <input
+                    type="date"
+                    {...register("fechaNacimiento")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
+                  />
+                  {errors.fechaNacimiento && <p className="text-xs text-red-600 mt-1">{errors.fechaNacimiento.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estado de Movilidad Actual *</label>
+                  <select
+                    {...register("movilidad")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
+                  >
+                    <option value="Independiente">Independiente (sin apoyo)</option>
+                    <option value="Bastón">Bastón / Muleta</option>
+                    <option value="Andador">Andador / Burrito</option>
+                    <option value="Silla de ruedas">Silla de ruedas</option>
+                    <option value="Otro">Otro tipo de asistencia</option>
+                  </select>
+                </div>
+              </div>
+
+              {watchMovilidad === "Otro" && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Especificar apoyo de movilidad</label>
+                  <input
+                    type="text"
+                    {...register("otraMovilidad")}
+                    className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm bg-white"
+                    placeholder="Ej: Órtesis antiequino, bastones canadienses..."
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 2. DIAGNÓSTICO E HISTORIA DE EM */}
+            <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
+              <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                2. Diagnóstico e Inicio de Esclerosis Múltiple
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de EM *</label>
+                  <select
+                    {...register("tipoEM")}
+                    className="w-full px-3 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white text-sm"
+                  >
+                    <option value="Remitente-Recurrente (EMRR)">EMRR (Remitente-Recurrente)</option>
+                    <option value="Secundaria Progresiva (EMSP)">EMSP (Secundaria Progresiva)</option>
+                    <option value="Primaria Progresiva (EMPP)">EMPP (Primaria Progresiva)</option>
+                    <option value="En estudio">En estudio</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Diagnóstico</label>
+                  <input
+                    type="date"
+                    {...register("fechaDiagnostico")}
+                    className="w-full px-3 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Edad de Inicio (años)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="120"
+                    {...register("edadInicio")}
+                    className="w-full px-3 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white text-sm"
+                    placeholder="Ej: 32"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha Primeros Síntomas</label>
+                  <input
+                    type="date"
+                    {...register("fechaPrimerosSintomas")}
+                    className="w-full px-3 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Descripción de Primeros Síntomas</label>
+                  <input
+                    type="text"
+                    {...register("descripcionPrimerosSintomas")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white text-sm"
+                    placeholder="Ej: Neuritis óptica derecha, parestesias en extremidades..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. EQUIPO MÉDICO */}
+            <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
+              <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                3. Equipo Médico Tratante
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Neurólogo Tratante *</label>
+                  <input
+                    type="text"
+                    {...register("neurologoTratante")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
+                    placeholder="Dr(a)..."
+                  />
+                  {errors.neurologoTratante && <p className="text-xs text-red-600 mt-1">{errors.neurologoTratante.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Centro Médico / Hospital *</label>
+                  <input
+                    type="text"
+                    {...register("centroMedico")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
+                    placeholder="Ej: Hospital Clínico..."
+                  />
+                  {errors.centroMedico && <p className="text-xs text-red-600 mt-1">{errors.centroMedico.message}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* 4. ANTECEDENTES Y ALERGIAS */}
+            <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
+              <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                4. Antecedentes Clínicos y Alergias
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Antecedentes Relevantes / Otras Patologías</label>
+                  <textarea
+                    rows={3}
+                    {...register("antecedentesRelevantes")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white text-sm"
+                    placeholder="Hipertensión, hipotiroidismo, cirugías previas, antecedentes familiares..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Alergias (Medicamentos / Otras)</label>
+                  <textarea
+                    rows={3}
+                    {...register("alergias")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white text-sm"
+                    placeholder="Ej: Penicilina, medios de contraste, látex (o 'Sin alergias conocidas')"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 5. TRATAMIENTO ACTUAL (LISTA DINÁMICA) */}
+            <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
+              <div className="flex justify-between items-center border-b border-orange-100 pb-2">
+                <div>
+                  <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider">5. Tratamiento Farmacológico Actual</h3>
+                  <p className="text-xs text-gray-600">Terapias modificadoras de la enfermedad (TME) y medicamentos sintomáticos.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => appendTratamiento({ medicamento: "", dosis: "", frecuencia: "" })}
+                  className="px-3 py-1.5 bg-orange-600 text-white text-xs font-bold rounded-lg hover:bg-orange-700 transition flex items-center gap-1 shadow-xs cursor-pointer"
+                >
+                  <span>+</span> Agregar Fármaco
+                </button>
+              </div>
+
+              {tratamientosFields.length === 0 ? (
+                <p className="text-xs text-gray-500 italic text-center py-3">
+                  No hay medicamentos registrados. Haz clic en "+ Agregar Fármaco" para añadir tu esquema actual.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {tratamientosFields.map((field, index) => (
+                    <div key={field.id} className="p-3.5 bg-white rounded-xl border border-orange-200/80 shadow-2xs space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">Medicamento #{index + 1} *</label>
+                          <input
+                            type="text"
+                            {...register(`tratamientosActuales.${index}.medicamento` as const)}
+                            className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-500"
+                            placeholder="Ej: Ocrelizumab, Fingolimod..."
+                          />
+                          {errors.tratamientosActuales?.[index]?.medicamento && (
+                            <p className="text-xs text-red-600 mt-0.5">{errors.tratamientosActuales[index]?.medicamento?.message}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">Dosis *</label>
+                          <input
+                            type="text"
+                            {...register(`tratamientosActuales.${index}.dosis` as const)}
+                            className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-500"
+                            placeholder="Ej: 600 mg / 0.5 mg"
+                          />
+                          {errors.tratamientosActuales?.[index]?.dosis && (
+                            <p className="text-xs text-red-600 mt-0.5">{errors.tratamientosActuales[index]?.dosis?.message}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">Frecuencia *</label>
+                          <input
+                            type="text"
+                            {...register(`tratamientosActuales.${index}.frecuencia` as const)}
+                            className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-500"
+                            placeholder="Ej: Cada 6 meses / Diario"
+                          />
+                          {errors.tratamientosActuales?.[index]?.frecuencia && (
+                            <p className="text-xs text-red-600 mt-0.5">{errors.tratamientosActuales[index]?.frecuencia?.message}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => removeTratamiento(index)}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium cursor-pointer"
+                        >
+                          🗑️ Eliminar medicamento
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 6. COBERTURA MÉDICA */}
+            <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
+              <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                6. Cobertura Médica y Beneficios
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {["Fonasa", "Isapre", "Otro"].map((item) => (
                   <label key={item} className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-lg border border-orange-200">
@@ -259,23 +541,19 @@ export default function FichaClinicaPage() {
                 ))}
               </div>
 
-              {watchCobertura === "Otro" && (
+              {(watchCobertura === "Isapre" || watchCobertura === "Otro") && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Especificar Isapre u otra cobertura</label>
                   <input
                     type="text"
                     {...register("otraIsapre")}
                     className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm bg-white"
-                    placeholder="Ej: Isapre Colmena, Particular, etc."
+                    placeholder="Ej: Isapre Colmena, Consalud, Particular, etc."
                   />
                 </div>
               )}
-            </div>
 
-            {/* Beneficios y Programas Activos */}
-            <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Beneficios y Programas Activos</h3>
-              <div className="space-y-3">
+              <div className="space-y-3 pt-2">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -300,8 +578,8 @@ export default function FichaClinicaPage() {
                     {...register("estudioClinico")}
                     onChange={(e) => {
                       setValue("estudioClinico", e.target.checked);
-                      if (e.target.checked && fields.length === 0) {
-                        append({ nombre: "", fechaInicio: "" });
+                      if (e.target.checked && estudiosFields.length === 0) {
+                        appendEstudio({ nombre: "", fechaInicio: "" });
                       }
                     }}
                     className="w-4 h-4 text-orange-600 rounded border-orange-300 focus:ring-orange-500"
@@ -316,14 +594,14 @@ export default function FichaClinicaPage() {
                     <h4 className="text-xs font-bold text-orange-800 uppercase tracking-wider">Estudios Clínicos Registrados</h4>
                     <button
                       type="button"
-                      onClick={() => append({ nombre: "", fechaInicio: "" })}
-                      className="px-2.5 py-1 bg-orange-600 text-white text-xs font-bold rounded-lg hover:bg-orange-700 transition flex items-center gap-1 shadow-xs"
+                      onClick={() => appendEstudio({ nombre: "", fechaInicio: "" })}
+                      className="px-2.5 py-1 bg-orange-600 text-white text-xs font-bold rounded-lg hover:bg-orange-700 transition flex items-center gap-1 shadow-xs cursor-pointer"
                     >
                       <span className="text-sm">+</span> Agregar Estudio
                     </button>
                   </div>
 
-                  {fields.map((field, index) => (
+                  {estudiosFields.map((field, index) => (
                     <div key={field.id} className="p-3 bg-white rounded-xl border border-orange-200/80 shadow-2xs space-y-3 relative">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -354,8 +632,8 @@ export default function FichaClinicaPage() {
                       <div className="flex justify-end">
                         <button
                           type="button"
-                          onClick={() => remove(index)}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
+                          onClick={() => removeEstudio(index)}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1 cursor-pointer"
                         >
                           🗑️ Eliminar este estudio
                         </button>
@@ -366,38 +644,43 @@ export default function FichaClinicaPage() {
               )}
             </div>
 
-            {/* Contacto de Emergencia */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-orange-200">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Contacto de Emergencia (Nombre)</label>
-                <input
-                  type="text"
-                  {...register("contactoEmergenciaNombre")}
-                  className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
-                  placeholder="Familiar o cercano"
-                />
-                {errors.contactoEmergenciaNombre && <p className="text-xs text-red-600 mt-1">{errors.contactoEmergenciaNombre.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Contacto de Emergencia (Teléfono)</label>
-                <input
-                  type="tel"
-                  {...register("contactoEmergenciaTelefono")}
-                  className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
-                  placeholder="+56 9 ..."
-                />
-                {errors.contactoEmergenciaTelefono && <p className="text-xs text-red-600 mt-1">{errors.contactoEmergenciaTelefono.message}</p>}
+            {/* 7. CONTACTO DE EMERGENCIA */}
+            <div className="p-4 bg-white/70 rounded-xl border border-orange-200/80 space-y-4">
+              <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider border-b border-orange-100 pb-2">
+                7. Red de Apoyo y Emergencia
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Contacto de Emergencia (Nombre) *</label>
+                  <input
+                    type="text"
+                    {...register("contactoEmergenciaNombre")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
+                    placeholder="Familiar o cercano"
+                  />
+                  {errors.contactoEmergenciaNombre && <p className="text-xs text-red-600 mt-1">{errors.contactoEmergenciaNombre.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Contacto de Emergencia (Teléfono) *</label>
+                  <input
+                    type="tel"
+                    {...register("contactoEmergenciaTelefono")}
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 text-gray-900 bg-white"
+                    placeholder="+56 9 ..."
+                  />
+                  {errors.contactoEmergenciaTelefono && <p className="text-xs text-red-600 mt-1">{errors.contactoEmergenciaTelefono.message}</p>}
+                </div>
               </div>
             </div>
 
-            {/* Botones de Acción */}
-            <div className="flex gap-4 pt-6 border-t border-orange-200">
+            {/* BOTONES DE ACCIÓN */}
+            <div className="flex gap-4 pt-4">
               <button
                 type="submit"
                 disabled={saving}
                 className="flex-1 py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white font-bold rounded-xl shadow-md hover:from-orange-700 hover:to-amber-700 transition cursor-pointer disabled:opacity-50"
               >
-                {saving ? "Actualizando datos..." : "Actualizar Ficha Médica"}
+                {saving ? "Actualizando datos..." : "Guardar y Actualizar Ficha Médica"}
               </button>
               <button
                 type="button"

@@ -146,7 +146,19 @@ export default function DashboardPage() {
               Registro y seguimiento de  tus Brotes.
             </p>
           </div>
-
+          {/*evolucion*/}
+          <div 
+            onClick={() => router.push("/dashboard/evolucion")}
+            className="bg-gradient-to-br from-white/90 to-orange-50/90 backdrop-blur-md p-6 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer border border-orange-200 border-l-4 border-l-orange-600"
+          >
+            <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-xl mb-3">
+              📈
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Evolucion</h3>
+            <p className="text-sm text-gray-600">
+              Tu evolucion en el tiempo.
+            </p>
+          </div>
 
 
 
